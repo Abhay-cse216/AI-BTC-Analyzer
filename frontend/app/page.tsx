@@ -142,7 +142,7 @@ console.log(
             ["♧", "Alerts"],
             ["▣", "Wallet Insights"],
             ["▤", "Reports"],
-          ].map(([icon, name]) => (
+          ] as const).map(([icon, name]) => (
             <button
               key={name}
               className={`nav-item ${
