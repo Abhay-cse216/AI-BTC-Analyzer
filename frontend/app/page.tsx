@@ -1,122 +1,178 @@
 "use client";
 
-import {
-  useEffect,
-  useState,
-  type CSSProperties,
-} from "react";
+import { useEffect, useState } from "react";
+import type { CSSProperties } from "react";
 
 import {
   getAnomalies,
   getMempoolAnomalies,
   getTransactionNetwork,
   getBackendHealth,
-  type BitcoinTransaction,
-  type NetworkResponse,
+} from "../services/bitcoinApi";
+
+import type {
+  BitcoinTransaction,
+  NetworkResponse,
 } from "../services/bitcoinApi";
 
 export default function Dashboard() {
   const [active, setActive] = useState("Dashboard");
-  const [backendOnline, setBackendOnline] = useState(false);
 
   const [transactions, setTransactions] = useState<
     BitcoinTransaction[]
   >([]);
-  const [
-  mempoolAnomalyCount,
-  setMempoolAnomalyCount,
-] = useState(0);
 
-const [
-  mempoolTransactionCount,
-  setMempoolTransactionCount,
-] = useState(0);
   const [network, setNetwork] =
     useState<NetworkResponse | null>(null);
 
+  const [mempoolAnomalyCount, setMempoolAnomalyCount] =
+    useState(0);
+
+  const [mempoolTransactionCount, setMempoolTransactionCount] =
+    useState(0);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [backendOnline, setBackendOnline] = useState(false);
 
-useEffect(() => {
-  async function loadData() {
-    try {
-      setLoading(true);
+  useEffect(() => {
+    async function loadData() {
+      try {
+        setLoading(true);
 
-const anomalyData = await getAnomalies();
+        // Load APIs sequentially to avoid temporary backend overload.
+        const anomalyData = await getAnomalies();
 
-const mempoolData = await getMempoolAnomalies();
+        const mempoolData =
+          await getMempoolAnomalies();
 
-const networkData = await getTransactionNetwork();
+        const networkData =
+          await getTransactionNetwork();
 
-    setTransactions(anomalyData.transactions);
+        setTransactions(
+          anomalyData.transactions
+        );
 
-setMempoolAnomalyCount(
-  mempoolData.anomaly_count
-);
-setMempoolTransactionCount(
-  mempoolData.transaction_count
-);
-setNetwork(networkData);
-      console.log(
-  "LIVE MEMPOOL:",
-  mempoolData.transactions
-);
+        setMempoolAnomalyCount(
+          mempoolData.anomaly_count
+        );
 
-console.log(
-  "LIVE MEMPOOL ANOMALIES:",
-  mempoolData.anomaly_count
-);
+        setMempoolTransactionCount(
+          mempoolData.transaction_count
+        );
 
-      await getBackendHealth();
+        setNetwork(networkData);
 
-      setBackendOnline(true);
-      setError("");
-    } catch (err) {
-      console.error(err);
+        await getBackendHealth();
 
-      setBackendOnline(false);
+        setBackendOnline(true);
+        setError("");
+      } catch (err) {
+        console.error(err);
 
-      setError(
-        "Unable to connect to Bitcoin backend."
-      );
-    } finally {
-      setLoading(false);
+        setBackendOnline(false);
+
+        setError(
+          "Unable to connect to Bitcoin backend."
+        );
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadData();
+
+    const interval = setInterval(
+      loadData,
+      30000
+    );
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const totalTransactions =
+    transactions.length;
+
+  const anomalyCount =
+    transactions.filter(
+      (tx) => tx.is_anomaly
+    ).length;
+
+  const highRiskCount =
+    transactions.filter(
+      (tx) => tx.risk_level === "HIGH"
+    ).length;
+
+  const mediumRiskCount =
+    transactions.filter(
+      (tx) => tx.risk_level === "MEDIUM"
+    ).length;
+
+  const lowRiskCount =
+    transactions.filter(
+      (tx) => tx.risk_level === "LOW"
+    ).length;
+
+  function navigate(name: string) {
+    setActive(name);
+
+    if (name === "Dashboard") {
+      window.location.href = "/";
+    }
+
+    if (name === "Transactions") {
+      window.location.href =
+        "/transactions";
+    }
+
+    if (name === "Risk Analysis") {
+      window.location.href =
+        "/risk-analysis";
+    }
+
+    if (name === "Network Graph") {
+      window.location.href =
+        "/network-graph";
+    }
+
+    if (name === "Alerts") {
+      window.location.href =
+        "/alerts";
+    }
+
+    if (name === "Wallet Insights") {
+      window.location.href =
+        "/wallet-insights";
+    }
+
+    if (name === "Reports") {
+      window.location.href =
+        "/reports";
     }
   }
 
-  loadData();
+  const riskTotal =
+    Math.max(
+      1,
+      totalTransactions
+    );
 
-  const interval = setInterval(
-    loadData,
-    30000
-  );
+  const highAngle =
+    (highRiskCount / riskTotal) *
+    360;
 
+  const mediumAngle =
+    ((highRiskCount +
+      mediumRiskCount) /
+      riskTotal) *
+    360;
 
-     
-
-    // Stop timer when page is closed
-    return () => {
-      clearInterval(interval);
-    };
-  }, []);
-
-  const totalTransactions = transactions.length;
-
-  const anomalyCount = transactions.filter(
-    (tx) => tx.is_anomaly
-  ).length;
-
-  const highRiskCount = transactions.filter(
-    (tx) => tx.risk_level === "HIGH"
-  ).length;
-
-  const mediumRiskCount = transactions.filter(
-    (tx) => tx.risk_level === "MEDIUM"
-  ).length;
-
-  const lowRiskCount = transactions.filter(
-    (tx) => tx.risk_level === "LOW"
-  ).length;
+  const donutStyle = {
+    "--high-angle":
+      `${highAngle}deg`,
+    "--medium-angle":
+      `${mediumAngle}deg`,
+  } as CSSProperties;
 
   return (
     <main className="dashboard">
@@ -125,7 +181,9 @@ console.log(
       <aside className="sidebar">
 
         <div className="brand">
-          <div className="bitcoin-logo">₿</div>
+          <div className="bitcoin-logo">
+            ₿
+          </div>
 
           <div>
             <strong>AI-BTC</strong>{" "}
@@ -134,7 +192,7 @@ console.log(
         </div>
 
         <nav>
-          {[
+          {([
             ["▦", "Dashboard"],
             ["⇄", "Transactions"],
             ["◉", "Risk Analysis"],
@@ -142,96 +200,84 @@ console.log(
             ["♧", "Alerts"],
             ["▣", "Wallet Insights"],
             ["▤", "Reports"],
-          ] as const).map(([icon, name]) => (
-            <button
-              key={name}
-              className={`nav-item ${
-                active === name ? "active" : ""
-              }`}
-     onClick={() => {
-  setActive(name);
+          ] as const).map(
+            ([icon, name]) => (
+              <button
+                key={name}
+                className={`nav-item ${
+                  active === name
+                    ? "active"
+                    : ""
+                }`}
+                onClick={() =>
+                  navigate(name)
+                }
+              >
+                <span className="nav-icon">
+                  {icon}
+                </span>
 
-  if (name === "Transactions") {
-    window.location.href = "/transactions";
-  }
-
-  if (name === "Risk Analysis") {
-    window.location.href = "/risk-analysis";
-  }
-
-  if (name === "Network Graph") {
-    window.location.href = "/network-graph";
-  }
-
-  if (name === "Alerts") {
-    window.location.href = "/alerts";
-  }
-
-  if (name === "Wallet Insights") {
-    window.location.href = "/wallet-insights";
-  }
-
-  if (name === "Reports") {
-    window.location.href = "/reports";
-  }
-}}
-            >
-              <span className="nav-icon">
-                {icon}
-              </span>
-
-              {name}
-            </button>
-          ))}
+                {name}
+              </button>
+            )
+          )}
         </nav>
 
         <div className="sidebar-bottom">
+
           <div className="system-status">
 
-            <span className="status-dot"></span>
+            <span
+              className={`status-dot ${
+                backendOnline
+                  ? "online"
+                  : "offline"
+              }`}
+            />
 
             <div>
-              <small>System Status</small>
+              <small>
+                System Status
+              </small>
+
               <strong>
-                Monitoring Active
+                {backendOnline
+                  ? "Monitoring Active"
+                  : "Connecting..."}
               </strong>
             </div>
 
           </div>
+
         </div>
 
       </aside>
 
-      {/* MAIN AREA */}
+      {/* MAIN CONTENT */}
       <section className="content">
 
         {/* TOP BAR */}
         <header className="topbar">
 
           <div className="search">
+
             <span>⌕</span>
 
             <input
               placeholder="Search transaction / wallet / hash..."
             />
+
           </div>
 
           <div className="top-actions">
 
-           <div className="live">
-  <span
-    className="live-dot"
-    style={{
-      background: backendOnline
-        ? "#3bdca4"
-        : "#ff587c",
-    }}
-  ></span>
+            <div className="live">
 
-  {backendOnline
-    ? "Live Data"
-    : "Backend Offline"}
-</div>
+              <span className="live-dot" />
+
+              Live Data
+
+            </div>
 
             <div className="ai-avatar">
               AI
@@ -245,38 +291,37 @@ console.log(
         <div className="page-header">
 
           <div>
-            <h1>Dashboard</h1>
+
+            <h1>
+              AI-BTC Analyzer
+            </h1>
 
             <p>
-              Real-time overview of Bitcoin
-              transaction activity and risk.
+              Real-time monitoring and
+              analysis of Bitcoin transaction
+              traffic.
             </p>
-            <div
-  style={{
-    marginTop: "8px",
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "8px",
-    padding: "6px 12px",
-    borderRadius: "20px",
-    background: "rgba(59, 220, 164, 0.08)",
-    border: "1px solid rgba(59, 220, 164, 0.25)",
-    color: "#3bdca4",
-    fontSize: "12px",
-    fontWeight: 600,
-  }}
->
-  <span
-    style={{
-      width: "7px",
-      height: "7px",
-      borderRadius: "50%",
-      background: "#3bdca4",
-    }}
-  ></span>
 
-  Live Mempool Anomalies: {mempoolAnomalyCount}
-</div>
+            <div className="mempool-badge">
+
+              <span />
+
+              Live Mempool Transactions:
+              {" "}
+              {loading
+                ? "..."
+                : mempoolTransactionCount}
+
+              {" • "}
+
+              Anomalies:
+              {" "}
+              {loading
+                ? "..."
+                : mempoolAnomalyCount}
+
+            </div>
+
           </div>
 
           <div className="data-badge">
@@ -331,13 +376,13 @@ console.log(
               </span>
 
               <h2>
-                 {loading
-                    ? "..."
-    : mempoolAnomalyCount}
+                {loading
+                  ? "..."
+                  : anomalyCount}
               </h2>
 
               <small>
-                Requires investigation
+                Unusual patterns
               </small>
             </div>
 
@@ -361,7 +406,7 @@ console.log(
               </h2>
 
               <small>
-                Risk score ≥ 75
+                Investigation priority
               </small>
             </div>
 
@@ -396,12 +441,13 @@ console.log(
         {/* CHART ROW */}
         <div className="chart-grid">
 
-          {/* DONUT */}
+          {/* RISK DISTRIBUTION */}
           <div className="panel">
 
             <div className="panel-header">
 
               <div>
+
                 <h3>
                   Transaction Risk Distribution
                 </h3>
@@ -409,6 +455,7 @@ console.log(
                 <p>
                   Current monitored transactions
                 </p>
+
               </div>
 
             </div>
@@ -417,33 +464,11 @@ console.log(
 
               <div
                 className="donut"
-                style={
-                  {
-                    "--high-angle":
-                      `${
-                        (highRiskCount /
-                          Math.max(
-                            1,
-                            totalTransactions
-                          )) *
-                        360
-                      }deg`,
-
-                    "--medium-angle":
-                      `${
-                        ((highRiskCount +
-                          mediumRiskCount) /
-                          Math.max(
-                            1,
-                            totalTransactions
-                          )) *
-                        360
-                      }deg`,
-                  } as CSSProperties
-                }
+                style={donutStyle}
               >
 
                 <div className="donut-center">
+
                   <strong>
                     {totalTransactions}
                   </strong>
@@ -451,6 +476,7 @@ console.log(
                   <span>
                     Transactions
                   </span>
+
                 </div>
 
               </div>
@@ -458,24 +484,30 @@ console.log(
               <div className="legend">
 
                 <div>
-                  <i className="legend-red"></i>
-                  <span>High Risk</span>
+                  <i className="legend-red" />
+                  <span>
+                    High Risk
+                  </span>
                   <strong>
                     {highRiskCount}
                   </strong>
                 </div>
 
                 <div>
-                  <i className="legend-orange"></i>
-                  <span>Medium Risk</span>
+                  <i className="legend-orange" />
+                  <span>
+                    Medium Risk
+                  </span>
                   <strong>
                     {mediumRiskCount}
                   </strong>
                 </div>
 
                 <div>
-                  <i className="legend-green"></i>
-                  <span>Low Risk</span>
+                  <i className="legend-green" />
+                  <span>
+                    Low Risk
+                  </span>
                   <strong>
                     {lowRiskCount}
                   </strong>
@@ -487,19 +519,22 @@ console.log(
 
           </div>
 
-          {/* ACTIVITY */}
+          {/* ACTIVITY CHART */}
           <div className="panel">
 
             <div className="panel-header">
 
               <div>
+
                 <h3>
                   Transaction Activity
                 </h3>
 
                 <p>
-                  Latest monitored transaction scores
+                  Real anomaly scores
+                  from monitored transactions
                 </p>
+
               </div>
 
             </div>
@@ -556,57 +591,71 @@ console.log(
 
                 {transactions
                   .slice(0, 10)
-                  .map((tx, index) => {
+                  .map(
+                    (tx, index) => {
 
-                    const x =
-                      55 +
-                      index *
-                        (500 / 9);
+                      const x =
+                        55 +
+                        index *
+                          (500 /
+                            Math.max(
+                              1,
+                              9
+                            ));
 
-                    const score =
-                      Math.min(
-                        100,
-                        Math.max(
-                          0,
-                          tx.anomaly_score
-                        )
+                      const score =
+                        Math.min(
+                          100,
+                          Math.max(
+                            0,
+                            tx.anomaly_score
+                          )
+                        );
+
+                      const y =
+                        220 -
+                        (score / 100) *
+                          190;
+
+                      return (
+                        <circle
+                          key={tx.txid}
+                          cx={x}
+                          cy={y}
+                          r={
+                            tx.is_anomaly
+                              ? 6
+                              : 4
+                          }
+                          className={
+                            tx.is_anomaly
+                              ? "real-anomaly-point"
+                              : "real-normal-point"
+                          }
+                        />
                       );
+                    }
+                  )}
 
-                    const y =
-                      220 -
-                      (score / 100) *
-                        190;
-
-                    return (
-                      <circle
-                        key={tx.txid}
-                        cx={x}
-                        cy={y}
-                        r={
-                          tx.is_anomaly
-                            ? 6
-                            : 4
-                        }
-                        className={
-                          tx.is_anomaly
-                            ? "real-anomaly-point"
-                            : "real-normal-point"
-                        }
-                      />
-                    );
-                  })}
-
-                {transactions.length > 1 && (
+                {transactions.length >
+                  1 && (
                   <polyline
                     points={transactions
                       .slice(0, 10)
                       .map(
-                        (tx, index) => {
+                        (
+                          tx,
+                          index
+                        ) => {
 
                           const x =
                             55 +
                             index *
-                              (500 / 9);
+                              (500 /
+                                Math.max(
+                                  1,
+                                  9
+                                ));
 
                           const score =
                             Math.min(
@@ -619,7 +668,8 @@ console.log(
 
                           const y =
                             220 -
-                            (score / 100) *
+                            (score /
+                              100) *
                               190;
 
                           return `${x},${y}`;
@@ -637,12 +687,12 @@ console.log(
             <div className="chart-legend">
 
               <span>
-                <i className="blue-dot"></i>
+                <i className="blue-dot" />
                 Normal
               </span>
 
               <span>
-                <i className="red-dot"></i>
+                <i className="red-dot" />
                 Anomalous
               </span>
 
@@ -661,14 +711,15 @@ console.log(
             <div className="panel-header">
 
               <div>
+
                 <h3>
                   Transaction Network
                 </h3>
 
                 <p>
-                  Real Bitcoin transaction
-                  relationships
+                  Real input/output relationships
                 </p>
+
               </div>
 
             </div>
@@ -690,19 +741,25 @@ console.log(
                             index
                           ) => {
 
-                            const sourceIndex =
-                              network.nodes.findIndex(
-                                (node) =>
-                                  node.id ===
-                                  edge.source
-                              );
+                            const
+                              sourceIndex =
+                                network.nodes.findIndex(
+                                  (
+                                    node
+                                  ) =>
+                                    node.id ===
+                                    edge.source
+                                );
 
-                            const targetIndex =
-                              network.nodes.findIndex(
-                                (node) =>
-                                  node.id ===
-                                  edge.target
-                              );
+                            const
+                              targetIndex =
+                                network.nodes.findIndex(
+                                  (
+                                    node
+                                  ) =>
+                                    node.id ===
+                                    edge.target
+                                );
 
                             if (
                               sourceIndex ===
@@ -713,33 +770,37 @@ console.log(
                               return null;
                             }
 
-                            const sourceX =
-                              40 +
-                              (sourceIndex %
-                                10) *
-                                55;
+                            const
+                              sourceX =
+                                40 +
+                                (sourceIndex %
+                                  10) *
+                                  55;
 
-                            const sourceY =
-                              40 +
-                              Math.floor(
-                                sourceIndex /
-                                  10
-                              ) *
-                                45;
+                            const
+                              sourceY =
+                                40 +
+                                Math.floor(
+                                  sourceIndex /
+                                    10
+                                ) *
+                                  45;
 
-                            const targetX =
-                              40 +
-                              (targetIndex %
-                                10) *
-                                55;
+                            const
+                              targetX =
+                                40 +
+                                (targetIndex %
+                                  10) *
+                                  55;
 
-                            const targetY =
-                              40 +
-                              Math.floor(
-                                targetIndex /
-                                  10
-                              ) *
-                                45;
+                            const
+                              targetY =
+                                40 +
+                                Math.floor(
+                                  targetIndex /
+                                    10
+                                ) *
+                                  45;
 
                             return (
                               <line
@@ -807,6 +868,7 @@ console.log(
             <div className="panel-header">
 
               <div>
+
                 <h3>
                   Recent Risk Alerts
                 </h3>
@@ -814,83 +876,91 @@ console.log(
                 <p>
                   Transactions requiring attention
                 </p>
+
               </div>
 
-             <button
-  className="view-all"
-  onClick={() => {
-    window.location.href = "/alerts";
-  }}
->
-  View All →
-</button>
+              <button
+                className="view-all"
+                onClick={() =>
+                  navigate("Alerts")
+                }
+              >
+                View All →
+              </button>
 
             </div>
 
             <div className="alerts-table">
 
               <div className="table-head">
-                <span>TRANSACTION</span>
-                <span>SCORE</span>
-                <span>RISK</span>
+
+                <span>
+                  TRANSACTION
+                </span>
+
+                <span>
+                  SCORE
+                </span>
+
+                <span>
+                  RISK
+                </span>
+
               </div>
 
-             {transactions
-  .filter((tx) => tx.risk_level !== "LOW")
-  .slice(0, 8)
-  .map((tx) => (
-    <div
-      className="table-row"
-      key={tx.txid}
-      style={{
-        display: "grid",
-        gridTemplateColumns: "1.5fr 100px 100px",
-        gap: "15px",
-        alignItems: "start",
-      }}
-    >
-      <div>
-        <div className="hash">
-          {tx.txid.slice(0, 8)}
-          ...
-          {tx.txid.slice(-6)}
-        </div>
+              {transactions
+                .filter(
+                  (tx) =>
+                    tx.risk_level !==
+                    "LOW"
+                )
+                .slice(0, 8)
+                .map((tx) => (
 
-        <div
-          style={{
-            marginTop: "6px",
-            fontSize: "11px",
-            color: "#71809d",
-            lineHeight: "1.5",
-          }}
-        >
-          {tx.risk_reasons?.join(" • ")}
-        </div>
-      </div>
+                  <div
+                    className="table-row"
+                    key={tx.txid}
+                  >
 
-    <div className="score">
-  <div>
-    Anomaly: {tx.anomaly_score.toFixed(2)}
-  </div>
+                    <span className="hash">
+                      {tx.txid.slice(
+                        0,
+                        8
+                      )}
+                      ...
+                      {tx.txid.slice(
+                        -6
+                      )}
+                    </span>
 
-  <div
-    style={{
-      marginTop: "4px",
-      fontSize: "11px",
-      color: "#71809d",
-    }}
-  >
-    Risk points: {tx.risk_points}
-  </div>
-</div>
+                    <span className="score">
+                      {tx.anomaly_score.toFixed(
+                        2
+                      )}
+                    </span>
 
-      <span
-        className={`risk ${tx.risk_level.toLowerCase()}`}
-      >
-        {tx.risk_level}
-      </span>
-    </div>
-  ))}
+                    <span
+                      className={`risk ${tx.risk_level.toLowerCase()}`}
+                    >
+                      {tx.risk_level}
+                    </span>
+
+                  </div>
+
+                ))}
+
+              {transactions.filter(
+                (tx) =>
+                  tx.risk_level !==
+                  "LOW"
+              ).length === 0 && (
+
+                <div className="empty">
+                  No elevated-risk
+                  transactions detected.
+                </div>
+
+              )}
 
             </div>
 
@@ -899,11 +969,13 @@ console.log(
         </div>
 
         <footer>
-          AI-BTC Analyzer • Bitcoin Transaction Intelligence
+          AI-BTC Analyzer • Bitcoin
+          Transaction Intelligence
         </footer>
 
       </section>
 
+      {/* STYLES */}
       <style jsx>{`
 
         * {
@@ -915,26 +987,32 @@ console.log(
           background: #060a14;
           color: #e8eefc;
           display: flex;
-          font-family: Arial, Helvetica, sans-serif;
+          font-family:
+            Arial,
+            Helvetica,
+            sans-serif;
         }
 
         .sidebar {
           width: 235px;
           min-height: 100vh;
           background: #080e1b;
-          border-right: 1px solid #182235;
+          border-right:
+            1px solid #182235;
           padding: 22px 14px;
           position: fixed;
           left: 0;
           top: 0;
           bottom: 0;
+          z-index: 10;
         }
 
         .brand {
           display: flex;
           align-items: center;
           gap: 10px;
-          padding: 4px 10px 30px;
+          padding:
+            4px 10px 30px;
           font-size: 15px;
         }
 
@@ -967,7 +1045,8 @@ console.log(
 
         .nav-item {
           border: 0;
-          background: transparent;
+          background:
+            transparent;
           color: #7f8ca7;
           padding: 12px;
           border-radius: 11px;
@@ -977,6 +1056,8 @@ console.log(
           cursor: pointer;
           text-align: left;
           font-size: 13px;
+          transition: 0.2s;
+          width: 100%;
         }
 
         .nav-item:hover {
@@ -985,9 +1066,16 @@ console.log(
         }
 
         .nav-item.active {
-          color: white;
-          background: #122c48;
-          box-shadow: inset 2px 0 0 #31b7ff;
+          color: #ffffff;
+          background:
+            linear-gradient(
+              90deg,
+              #122c48,
+              #102034
+            );
+          box-shadow:
+            inset 2px 0 0
+            #31b7ff;
         }
 
         .nav-icon {
@@ -1005,7 +1093,8 @@ console.log(
 
         .system-status {
           background: #0d1728;
-          border: 1px solid #1c2a40;
+          border:
+            1px solid #1c2a40;
           border-radius: 12px;
           padding: 12px;
           display: flex;
@@ -1019,7 +1108,15 @@ console.log(
           height: 8px;
           border-radius: 50%;
           background: #31df9b;
-          box-shadow: 0 0 10px #31df9b;
+          box-shadow:
+            0 0 10px #31df9b;
+          flex-shrink: 0;
+        }
+
+        .status-dot.offline {
+          background: #ff5478;
+          box-shadow:
+            0 0 10px #ff5478;
         }
 
         .system-status small {
@@ -1037,13 +1134,16 @@ console.log(
 
         .content {
           margin-left: 235px;
-          width: calc(100% - 235px);
-          padding: 0 25px 25px;
+          width:
+            calc(100% - 235px);
+          padding:
+            0 25px 25px;
         }
 
         .topbar {
           height: 70px;
-          border-bottom: 1px solid #131d2f;
+          border-bottom:
+            1px solid #131d2f;
           display: flex;
           align-items: center;
           justify-content: space-between;
@@ -1053,7 +1153,8 @@ console.log(
           width: 440px;
           height: 38px;
           background: #0b1424;
-          border: 1px solid #1a2940;
+          border:
+            1px solid #1a2940;
           border-radius: 10px;
           display: flex;
           align-items: center;
@@ -1063,7 +1164,8 @@ console.log(
         }
 
         .search input {
-          background: transparent;
+          background:
+            transparent;
           border: none;
           outline: none;
           color: white;
@@ -1082,9 +1184,11 @@ console.log(
         }
 
         .live {
-          border: 1px solid #253249;
+          border:
+            1px solid #253249;
           background: #0c1525;
-          padding: 8px 13px;
+          padding:
+            8px 13px;
           border-radius: 18px;
           font-size: 11px;
           display: flex;
@@ -1097,11 +1201,12 @@ console.log(
           width: 34px;
           height: 34px;
           border-radius: 50%;
-          background: linear-gradient(
-            135deg,
-            #5e8cff,
-            #a855f7
-          );
+          background:
+            linear-gradient(
+              135deg,
+              #5e8cff,
+              #a855f7
+            );
           display: flex;
           align-items: center;
           justify-content: center;
@@ -1110,7 +1215,8 @@ console.log(
         }
 
         .page-header {
-          padding: 25px 0 20px;
+          padding:
+            25px 0 20px;
           display: flex;
           align-items: center;
           justify-content: space-between;
@@ -1119,6 +1225,7 @@ console.log(
         h1 {
           margin: 0;
           font-size: 24px;
+          letter-spacing: -0.5px;
         }
 
         .page-header p {
@@ -1128,40 +1235,88 @@ console.log(
         }
 
         .data-badge {
-          border: 1px solid #1b8066;
+          border:
+            1px solid #1b8066;
           color: #42e0ad;
           background: #08251e;
           border-radius: 7px;
-          padding: 7px 11px;
+          padding:
+            7px 11px;
           font-size: 10px;
           font-weight: bold;
         }
 
+        .mempool-badge {
+          margin-top: 10px;
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          padding:
+            6px 12px;
+          border-radius: 20px;
+          background:
+            rgba(
+              59,
+              220,
+              164,
+              0.08
+            );
+          border:
+            1px solid
+            rgba(
+              59,
+              220,
+              164,
+              0.25
+            );
+          color: #3bdca4;
+          font-size: 11px;
+          font-weight: 600;
+        }
+
+        .mempool-badge span {
+          width: 7px;
+          height: 7px;
+          border-radius: 50%;
+          background: #3bdca4;
+        }
+
         .error-box {
-          background: #351722;
-          border: 1px solid #7d2941;
-          color: #ff7d99;
-          padding: 12px;
+          background: #351725;
+          border:
+            1px solid #7d2947;
+          color: #ff7895;
           border-radius: 10px;
+          padding: 12px 15px;
           margin-bottom: 14px;
           font-size: 12px;
         }
 
         .kpi-grid {
           display: grid;
-          grid-template-columns: repeat(4, 1fr);
+          grid-template-columns:
+            repeat(4, 1fr);
           gap: 14px;
         }
 
         .kpi-card {
           min-height: 110px;
-          border: 1px solid #19263b;
-          background: #10192b;
+          border:
+            1px solid #19263b;
+          background:
+            linear-gradient(
+              145deg,
+              #10192b,
+              #0c1423
+            );
           border-radius: 15px;
           padding: 18px;
           display: flex;
           gap: 14px;
           align-items: center;
+          box-shadow:
+            0 10px 30px
+            rgba(0,0,0,0.12);
         }
 
         .kpi-icon {
@@ -1201,7 +1356,8 @@ console.log(
         }
 
         .kpi-card h2 {
-          margin: 6px 0 3px;
+          margin:
+            6px 0 3px;
           font-size: 25px;
         }
 
@@ -1213,26 +1369,40 @@ console.log(
         .chart-grid,
         .bottom-grid {
           display: grid;
-          grid-template-columns: 1fr 1fr;
+          grid-template-columns:
+            1fr 1fr;
           gap: 14px;
           margin-top: 14px;
         }
 
         .panel {
-          background: #0e1728;
-          border: 1px solid #19263b;
+          background:
+            linear-gradient(
+              145deg,
+              #0e1728,
+              #0a1220
+            );
+          border:
+            1px solid #19263b;
           border-radius: 15px;
           min-height: 290px;
           overflow: hidden;
         }
 
         .panel-header {
-          padding: 18px 19px 10px;
+          padding:
+            18px 19px 10px;
+          display: flex;
+          justify-content:
+            space-between;
+          align-items:
+            flex-start;
         }
 
         .panel-header h3 {
           margin: 0;
           font-size: 13px;
+          color: #e2e9f8;
         }
 
         .panel-header p {
@@ -1254,11 +1424,20 @@ console.log(
           height: 145px;
           border-radius: 50%;
           position: relative;
-          background: conic-gradient(
-            #ff5379 0deg var(--high-angle),
-            #ffb83f var(--high-angle) var(--medium-angle),
-            #34dfa6 var(--medium-angle) 360deg
-          );
+          background:
+            conic-gradient(
+              #ff5379
+              0deg
+              var(--high-angle),
+
+              #ffb83f
+              var(--high-angle)
+              var(--medium-angle),
+
+              #34dfa6
+              var(--medium-angle)
+              360deg
+            );
           display: flex;
           align-items: center;
           justify-content: center;
@@ -1296,7 +1475,8 @@ console.log(
 
         .legend div {
           display: grid;
-          grid-template-columns: 9px 80px 25px;
+          grid-template-columns:
+            9px 80px 25px;
           align-items: center;
           gap: 8px;
           font-size: 10px;
@@ -1321,11 +1501,17 @@ console.log(
           background: #34dfa6;
         }
 
+        .legend strong {
+          color: #dce5f5;
+        }
+
         .activity-chart {
           height: 190px;
           position: relative;
-          margin: 5px 18px 0;
-          border-bottom: 1px solid #1b2739;
+          margin:
+            5px 18px 0;
+          border-bottom:
+            1px solid #1b2739;
         }
 
         .y-labels {
@@ -1335,7 +1521,8 @@ console.log(
           height: 165px;
           display: flex;
           flex-direction: column;
-          justify-content: space-between;
+          justify-content:
+            space-between;
           color: #4f5c73;
           font-size: 8px;
         }
@@ -1344,7 +1531,8 @@ console.log(
           position: absolute;
           left: 30px;
           top: 0;
-          width: calc(100% - 30px);
+          width:
+            calc(100% - 30px);
           height: 175px;
         }
 
@@ -1369,6 +1557,10 @@ console.log(
           fill: #ff547a;
           stroke: #ffd0da;
           stroke-width: 2;
+          filter:
+            drop-shadow(
+              0 0 5px #ff547a
+            );
         }
 
         .chart-legend {
@@ -1403,7 +1595,8 @@ console.log(
 
         .network {
           height: 255px;
-          padding: 5px 20px 20px;
+          padding:
+            5px 20px 20px;
         }
 
         .network svg {
@@ -1422,44 +1615,56 @@ console.log(
 
         .node-red {
           fill: #ff5478;
+          filter:
+            drop-shadow(
+              0 0 5px #ff5478
+            );
         }
 
         .view-all {
           border: none;
-          background: transparent;
+          background:
+            transparent;
           color: #31c4ff;
           font-size: 10px;
           cursor: pointer;
         }
 
         .alerts-table {
-          padding: 5px 18px 15px;
+          padding:
+            5px 18px 15px;
         }
 
         .table-head,
         .table-row {
           display: grid;
-          grid-template-columns: 1fr 70px 80px;
+          grid-template-columns:
+            1fr 70px 80px;
           align-items: center;
           gap: 10px;
         }
 
         .table-head {
-          padding: 12px 8px;
+          padding:
+            12px 8px;
           color: #526078;
           font-size: 8px;
-          border-bottom: 1px solid #1b2739;
+          border-bottom:
+            1px solid #1b2739;
         }
 
         .table-row {
-          padding: 13px 8px;
-          border-bottom: 1px solid #131e31;
+          padding:
+            13px 8px;
+          border-bottom:
+            1px solid #131e31;
           font-size: 10px;
         }
 
         .hash {
           color: #42bfff;
-          font-family: monospace;
+          font-family:
+            monospace;
         }
 
         .score {
@@ -1468,7 +1673,8 @@ console.log(
 
         .risk {
           width: fit-content;
-          padding: 4px 7px;
+          padding:
+            4px 7px;
           border-radius: 5px;
           font-size: 8px;
           font-weight: bold;
@@ -1489,6 +1695,13 @@ console.log(
           color: #3bdca4;
         }
 
+        .empty {
+          padding: 30px;
+          text-align: center;
+          color: #65738c;
+          font-size: 11px;
+        }
+
         footer {
           text-align: center;
           color: #3e4c64;
@@ -1497,24 +1710,49 @@ console.log(
         }
 
         @media (max-width: 1100px) {
+
           .kpi-grid {
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns:
+              repeat(2, 1fr);
           }
 
           .chart-grid,
           .bottom-grid {
-            grid-template-columns: 1fr;
+            grid-template-columns:
+              1fr;
           }
+
         }
 
         @media (max-width: 700px) {
+
           .sidebar {
             width: 70px;
           }
 
+          .brand div:last-child {
+            display: none;
+          }
+
+          .nav-item {
+            justify-content: center;
+            padding: 12px 5px;
+          }
+
+          .nav-item {
+            font-size: 0;
+          }
+
+          .nav-icon {
+            font-size: 17px;
+          }
+
           .content {
             margin-left: 70px;
-            width: calc(100% - 70px);
+            width:
+              calc(100% - 70px);
+            padding:
+              0 12px 20px;
           }
 
           .search {
@@ -1522,8 +1760,20 @@ console.log(
           }
 
           .kpi-grid {
-            grid-template-columns: 1fr;
+            grid-template-columns:
+              1fr;
           }
+
+          .page-header {
+            align-items:
+              flex-start;
+            gap: 15px;
+          }
+
+          .donut-area {
+            gap: 15px;
+          }
+
         }
 
       `}</style>
