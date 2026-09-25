@@ -29,7 +29,7 @@ export interface AnomaliesResponse {
   checked_at: string;
 }
 
-const API_BASE_URL = "http://127.0.0.1:8000";
+const API_BASE_URL = "https://ai-btc-analyzer.onrender.com";
 
 export async function getAnomalies(): Promise<AnomaliesResponse> {
   const response = await fetch(
