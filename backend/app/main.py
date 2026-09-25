@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api import health 
 from app.config import get_settings
 from app.api.bitcoin import router as bitcoin_router
-from fastapi.middleware.cors import CORSMiddleware
+
 
 settings = get_settings()
 
@@ -26,9 +26,10 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://ai-btc-analyzer-kappa.vercel.app",
+],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
